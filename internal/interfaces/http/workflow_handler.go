@@ -11,6 +11,7 @@ import (
 	"github.com/SahidAyala/Nocturn-Atlas-Workflow-Engine/internal/app"
 	"github.com/SahidAyala/Nocturn-Atlas-Workflow-Engine/internal/auth"
 	"github.com/SahidAyala/Nocturn-Atlas-Workflow-Engine/internal/infrastructure/db"
+	"github.com/SahidAyala/Nocturn-Atlas-Workflow-Engine/internal/infrastructure/db/models"
 	"github.com/SahidAyala/Nocturn-Atlas-Workflow-Engine/internal/interfaces/http/respond"
 )
 
@@ -175,7 +176,7 @@ func (h *WorkflowHandler) CreateWorkflowRun(w http.ResponseWriter, r *http.Reque
 //	@Tags			workflows
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Success		200	{array}	models.Workflow
+//	@Success		200	{array}	workflowResponse
 //	@Failure		401	{object}	JSONError
 //	@Failure		500	{object}	JSONError
 //	@Router			/workflows [get]
@@ -191,7 +192,38 @@ func (h *WorkflowHandler) GetAllWorkflows(w http.ResponseWriter, r *http.Request
 		writeJSONError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	writeJSON(w, http.StatusOK, workflows)
+	resp := make([]workflowResponse, 0, len(workflows))
+	for _, wf := range workflows {
+		resp = append(resp, mapWorkflowToResponse(wf))
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// workflowResponse is the JSON shape for a workflow definition. Snake_case to
+// match the UI's WorkflowDefinitionRaw / mapDefinition() contract
+// (ui/src/lib/api/workflows.ts) — models.Workflow carries only `db:` tags and
+// must never be serialized directly (it defaults to PascalCase and was the
+// root cause of the workflows list rendering empty in the UI).
+type workflowResponse struct {
+	ID          string  `json:"id"`
+	ProjectID   string  `json:"project_id"`
+	Name        string  `json:"name"`
+	Slug        string  `json:"slug"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt   string  `json:"created_at"`
+	UpdatedAt   string  `json:"updated_at"`
+}
+
+func mapWorkflowToResponse(wf models.Workflow) workflowResponse {
+	return workflowResponse{
+		ID:          wf.ID,
+		ProjectID:   wf.ProjectID,
+		Name:        wf.Name,
+		Slug:        wf.Slug,
+		Description: wf.Description,
+		CreatedAt:   wf.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   wf.UpdatedAt.Format(time.RFC3339),
+	}
 }
 
 // workflowRunResponse is the JSON shape for a single workflow run (matches UI WorkflowRun type).
