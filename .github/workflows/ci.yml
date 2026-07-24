@@ -44,6 +44,11 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
+      # Required for internal/infrastructure/db's integration tests (gated on
+      # DATABASE_URL — skipped automatically if this step is ever removed).
+      - name: Apply database migrations
+        run: ./internal/infrastructure/db/migrate-up.sh
+
       - name: Build (api)
         run: go build ./cmd/api
 
